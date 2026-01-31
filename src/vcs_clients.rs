@@ -116,11 +116,21 @@ impl Default for RateLimitedClient {
 /// GitHub API client
 pub struct GitHubClient {
     client: CachedRateLimitedClient,
+    api_base_url: String,
 }
 
 impl GitHubClient {
     pub fn new(client: CachedRateLimitedClient) -> Self {
-        Self { client }
+        Self {
+            client,
+            api_base_url: "https://api.github.com".to_string(),
+        }
+    }
+
+    #[cfg(test)]
+    fn with_api_base_url(mut self, api_base_url: String) -> Self {
+        self.api_base_url = api_base_url.trim_end_matches('/').to_string();
+        self
     }
 
     pub fn with_cache_disabled(mut self) -> Self {
@@ -153,8 +163,8 @@ impl VcsClient for GitHubClient {
 
         loop {
             let url = format!(
-                "https://api.github.com/orgs/{}/repos?page={}&per_page={}",
-                org, page, per_page
+                "{}/orgs/{}/repos?page={}&per_page={}",
+                self.api_base_url, org, page, per_page
             );
 
             let mut request = self.client.client().client().request(reqwest::Method::GET, &url);
@@ -890,7 +900,8 @@ mod tests {
         let client = GitHubClient::new(CachedRateLimitedClient::new(
             RateLimitedClient::new(RateLimitConfig::default()),
             RepoCache::new(PathBuf::from("./test_cache"), Duration::from_secs(3600), true),
-        ));
+        ))
+        .with_api_base_url(mock_server.uri());
 
         // Ensure cache is cleared before test
         let _ = client.client.cache().clear();

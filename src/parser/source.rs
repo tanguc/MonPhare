@@ -136,6 +136,26 @@ fn is_local_path(source: &str) -> bool {
         || (source.len() >= 2 && source.chars().nth(1) == Some(':')) // Windows paths
 }
 
+/// Normalize a Git repository URL into a canonical `host/path` identifier.
+///
+/// Examples:
+/// - `https://github.com/org/repo.git` -> `github.com/org/repo`
+/// - `ssh://git@ssh.dev.azure.com/v3/org/project/repo.git` -> `ssh.dev.azure.com/v3/org/project/repo`
+fn canonical_git_host_from_url(url: &str) -> Option<String> {
+    let parsed = url::Url::parse(url).ok()?;
+    let host = parsed.host_str()?;
+    let mut path = parsed.path().trim_matches('/').to_string();
+    if let Some(stripped) = path.strip_suffix(".git") {
+        path = stripped.to_string();
+    }
+
+    if path.is_empty() {
+        Some(host.to_string())
+    } else {
+        Some(format!("{host}/{path}"))
+    }
+}
+
 /// Try to parse a Git source.
 fn try_parse_git_source(source: &str) -> Option<ModuleSource> {
     // git:: prefix
@@ -144,19 +164,27 @@ fn try_parse_git_source(source: &str) -> Option<ModuleSource> {
         let ref_ = caps.get(2).map(|m| m.as_str().to_string());
         let subdir = caps.get(3).map(|m| m.as_str().to_string());
 
-        return Some(ModuleSource::Git { host: format!("git::{}", url.clone()), url, ref_, subdir });
+        let host = canonical_git_host_from_url(&url).unwrap_or_else(|| url.clone());
+        return Some(ModuleSource::Git { host, url, ref_, subdir });
     }
 
     // git@host:path format
     if let Some(caps) = GIT_SSH_PATTERN.captures(source) {
         let host = caps.get(1)?.as_str();
         let path = caps.get(2)?.as_str();
+
+        tracing::debug!(host = host, path = path, "Parsed Git SSH source");
         let url = format!("ssh://git@{host}/{path}");
         let ref_ = caps.get(3).map(|m| m.as_str().to_string());
         let subdir = caps.get(4).map(|m| m.as_str().to_string());
 
         tracing::debug!(url = &url, ref_ = &ref_, subdir = subdir.as_deref().unwrap_or_default() , "Parsed Git SSH source");
-        return Some(ModuleSource::Git { host: host.to_string(), url, ref_, subdir });
+        let canonical_host = format!(
+            "{}/{}",
+            host,
+            path.trim_start_matches('/').trim_end_matches(".git")
+        );
+        return Some(ModuleSource::Git { host: canonical_host, url, ref_, subdir });
     }
 
     // GitHub shorthand
@@ -166,7 +194,7 @@ fn try_parse_git_source(source: &str) -> Option<ModuleSource> {
         let url = format!("https://github.com/{owner}/{repo}.git");
         let ref_ = caps.get(3).map(|m| m.as_str().to_string());
         let subdir = caps.get(4).map(|m| m.as_str().to_string());
-        return Some(ModuleSource::Git { host: format!("github.com/{owner}/{repo}.git"), url, ref_, subdir });
+        return Some(ModuleSource::Git { host: format!("github.com/{owner}/{repo}"), url, ref_, subdir });
     }
 
     None
@@ -310,7 +338,7 @@ mod tests {
         match source {
             ModuleSource::Git { host, url, ref_, subdir } => {
                 assert_eq!(url, "https://github.com/example/module.git");
-                assert_eq!(host, "github.com/example/module.git");
+                assert_eq!(host, "github.com/example/module");
                 assert!(ref_.is_none());
                 assert!(subdir.is_none());
             }
@@ -332,6 +360,7 @@ mod tests {
 
     #[test]
     fn test_parse_git_with_subdir() {
+        
         let source =
             parse_module_source("git::https://github.com/example/module.git//modules/vpc").unwrap();
         match source {
@@ -347,7 +376,7 @@ mod tests {
         let source = parse_module_source("git@github.com:example/module.git").unwrap();
         match source {
             ModuleSource::Git { host, url, .. } => {
-                assert_eq!(host, "github.com/example/module.git");
+                assert_eq!(host, "github.com/example/module");
                 assert!(url.contains("github.com"));
             }
             _ => panic!("Expected Git source"),
@@ -414,7 +443,8 @@ mod tests {
     fn test_parse_github_shorthand() {
         let source = parse_module_source("github.com/example/terraform-module").unwrap();
         match source {
-            ModuleSource::Git { url, .. } => {
+            ModuleSource::Git { host, url, .. } => {
+                assert_eq!(host, "github.com/example/terraform-module");
                 assert!(url.contains("github.com"));
                 assert!(url.contains("example/terraform-module"));
             }

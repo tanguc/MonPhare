@@ -1,24 +1,24 @@
 {
   "cached_at": {
-    "secs_since_epoch": 1767289308,
-    "nanos_since_epoch": 807126000
+    "secs_since_epoch": 1769897353,
+    "nanos_since_epoch": 903580000
   },
   "repos": [
     {
-      "name": "test-proj",
-      "clone_url": "https://github.com/test-org/test-proj.git",
-      "default_branch": "master",
+      "name": "repo1",
+      "clone_url": "https://github.com/test-org/repo1",
+      "default_branch": "main",
       "archived": false,
       "fork": false,
-      "platform_id": "835898"
+      "platform_id": "1"
     },
     {
-      "name": "example",
-      "clone_url": "https://github.com/test-org/example.git",
-      "default_branch": "master",
+      "name": "repo2",
+      "clone_url": "https://github.com/test-org/repo2",
+      "default_branch": "main",
       "archived": false,
-      "fork": true,
-      "platform_id": "1517555"
+      "fork": false,
+      "platform_id": "2"
     }
   ]
 }

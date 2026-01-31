@@ -281,16 +281,49 @@ fn module_deprecation_keys(source: &ModuleSource) -> Vec<String> {
     tracing::debug!("looking for module deprecations for source: {:#?}", source);
     match source {
         ModuleSource::Git { host, url, subdir, .. } => {
-            let mut key = host.clone();
-            tracing::debug!(host = &host, subdir = subdir.as_deref().unwrap_or_default(), "Module deprecation key");
-            if let Some(s) = subdir {
-                if !s.is_empty() {
-                    key.push_str(&format!("//{s}"));
-                } else {
-                    tracing::warn!("you're trying to match a git module with a subdir that is empty, can have unexpected results, skipping this subdir");
+            let mut keys: Vec<String> = Vec::new();
+            let mut seen: HashSet<String> = HashSet::new();
+
+            let mut push_key = |k: String| {
+                if seen.insert(k.clone()) {
+                    keys.push(k);
+                }
+            };
+
+            // Preferred canonical form: `host/path` (no scheme, no `.git`)
+            push_key(host.clone());
+
+            // Backward-compatible forms users often have in configs:
+            // - raw URL (ssh://..., https://...)
+            // - Terraform `git::` URL
+            push_key(url.clone());
+            push_key(format!("git::{url}"));
+
+            // Backward-compatible SCP style: `git@host:path`
+            if let Ok(parsed) = url::Url::parse(url) {
+                if parsed.scheme() == "ssh" {
+                    if let Some(h) = parsed.host_str() {
+                        let path = parsed.path().trim_start_matches('/');
+                        if !path.is_empty() {
+                            let user = parsed.username();
+                            let user = if user.is_empty() { "git" } else { user };
+                            push_key(format!("{user}@{h}:{path}"));
+                        }
+                    }
                 }
             }
-            vec![key]
+
+            // Apply optional subdir (`//...`) to all base keys
+            let subdir_suffix = subdir
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .map(|s| format!("//{s}"));
+
+            if let Some(suffix) = subdir_suffix {
+                keys.into_iter().map(|k| format!("{k}{suffix}")).collect()
+            } else {
+                keys
+            }
         }
         ModuleSource::Registry {
             hostname,
@@ -419,8 +452,7 @@ mod tests {
 
         // Git module rule (Azure DevOps SSH normalized URL + subdir; match by git_ref)
         config.deprecations.modules.insert(
-            "ssh://git@ssh.dev.azure.com/v3/foo-bar/Terraform/mod-azurerm-resource-group"
-                .to_string(),
+            "ssh.dev.azure.com/v3/foo-bar/Terraform/mod-azurerm-resource-group".to_string(),
             vec![DeprecationRef {
                 version: None,
                 git_ref: Some("refs/tags/3.0.0".to_string()),
@@ -570,7 +602,7 @@ mod tests {
         assert!(deprecated_sources
             .contains("registry.terraform.io/terraform-aws-modules/eks/aws"));
         assert!(deprecated_sources.contains(
-            "ssh://git@ssh.dev.azure.com/v3/foo-bar/Terraform/mod-azurerm-resource-group?ref=refs/tags/3.0.0"
+            "ssh.dev.azure.com/v3/foo-bar/Terraform/mod-azurerm-resource-group?ref=refs/tags/3.0.0"
         ));
     }
 }

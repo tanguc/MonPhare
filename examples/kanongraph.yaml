@@ -92,6 +92,12 @@ deprecations:
 
   modules:
     # Module source identifier (use canonical format or shorthand)
+    #
+    # Git modules: prefer the canonical `host/path` form (no scheme, no `.git`),
+    # optionally with `//subdir` for mono-repos.
+    # Examples:
+    # - `github.com/org/repo`
+    # - `ssh.dev.azure.com/v3/org/project/repo`
     "claranet/azure-log-mngt-v1/azurerm":
       - version: "1.0.1"
         reason: "Critical security vulnerability CVE-2023-1234"

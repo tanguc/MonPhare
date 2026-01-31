@@ -92,6 +92,12 @@ deprecations:
 
   modules:
     # Module source identifier (use canonical format or shorthand)
+    #
+    # Git modules: prefer the canonical `host/path` form (no scheme, no `.git`),
+    # optionally with `//subdir` for mono-repos.
+    # Examples:
+    # - `github.com/org/repo`
+    # - `ssh.dev.azure.com/v3/org/project/repo`
     "claranet/azure-log-mngt-v1/azurerm":
       - version: "1.0.1"
         reason: "Critical security vulnerability CVE-2023-1234"
@@ -114,19 +120,19 @@ deprecations:
         severity: error
         replacement: "claranet/azure-log-mngt-v3/azurerm"
 
-    "git@ssh.dev.azure.com:v3/lpl-sources/Terraform/mod-azure-gov-tags":
+    "ssh.dev.azure.com/v3/lpl-sources/Terraform/mod-azure-gov-tags":
       - version: "< 3.0.0"
         reason: "CVE-2025-2393 detected during security audit by Alpha team"
         severity: error
         replacement: "3.0.0"
 
-    "git@ssh.dev.azure.com:v3/lpl-sources/Terraform/mod-azure-gov-security-ips":
+    "ssh.dev.azure.com/v3/lpl-sources/Terraform/mod-azure-gov-security-ips":
       - version: "< 12.0.0"
         reason: "Deprecated module, migrate to v12.0.0 or later"
         severity: error
         replacement: ">= 12.0.0"
 
-    "git@ssh.dev.azure.com:v3/lpl-sources/Terraform/mod-azurerm-resource-group":
+    "ssh.dev.azure.com/v3/lpl-sources/Terraform/mod-azurerm-resource-group":
       - version: "< 3.0.0"
         reason: "Deprecated module, migrate to v3.0.0 or later"
         severity: error

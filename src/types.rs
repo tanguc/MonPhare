@@ -777,8 +777,6 @@ impl std::fmt::Display for Location {
 /// Category of findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FindingCategory {
-    /// Version constraint conflict
-    ConstraintConflict,
     /// Missing version constraint
     MissingConstraint,
     /// Overly broad constraint
@@ -798,7 +796,6 @@ pub enum FindingCategory {
 impl std::fmt::Display for FindingCategory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ConstraintConflict => write!(f, "Constraint Conflict"),
             Self::MissingConstraint => write!(f, "Missing Constraint"),
             Self::BroadConstraint => write!(f, "Broad Constraint"),
             Self::Deprecated => write!(f, "Deprecated"),

@@ -91,7 +91,7 @@ cargo llvm-cov --all-features --lcov --output-path lcov.info
 2. **Scanner Layer**: Coordinates operations, manages Git cloning via `GitClient`
 3. **Parser Layer**: Uses `HclParser` to walk directories and parse .tf files with hcl-rs, extracting `ModuleRef` and `ProviderRef` structures
 4. **Graph Layer**: `GraphBuilder` creates dependency graph using petgraph DiGraph with nodes for modules/providers and edges for dependencies
-5. **Analyzer Layer**: `ConstraintAnalyzer` groups modules/providers by source, performs pairwise constraint comparison, and detects conflicts
+5. **Analyzer Layer**: `Analyzer` performs policy checks (missing constraints, risky patterns, broad constraints) and deprecation detection
 6. **Reporter Layer**: Generates reports in JSON, Text, or HTML formats
 7. **Output Layer**: Produces stdout, file output, and appropriate exit codes (0=success, 1=warnings with --strict, 2=errors)
 
@@ -141,11 +141,7 @@ src/
 - **ModuleSource**: Enum for different source types (Registry, Git, Local, S3, Unknown)
 - **Constraint**: Version constraint with raw string and parsed VersionRange vector
 - **DependencyGraph**: petgraph DiGraph with GraphNode (Module/Provider) and EdgeType, plus HashMap for O(1) lookup
-- **Finding**: Analysis issue with code (DRIFT001-007), severity, message, location
-
-### Version Constraint Detection
-
-The analyzer groups all modules/providers by canonical source ID, then performs pairwise comparison within each group to check for overlapping version constraints. Conflicts are reported when constraints have no overlapping versions.
+- **Finding**: Analysis issue with code (DRIFT002-007), severity, message, location
 
 ### Module Source Parsing
 
@@ -159,7 +155,6 @@ Uses regex patterns with fallback to `Unknown` for unrecognized formats.
 
 ## Finding Codes
 
-- **DRIFT001**: Version constraint conflict (incompatible versions)
 - **DRIFT002**: Missing version constraint
 - **DRIFT003**: Wildcard constraint (using `*`)
 - **DRIFT004**: Overly broad constraint (e.g., `>= 0.0.0`)

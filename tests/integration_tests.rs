@@ -107,42 +107,6 @@ mod analyzer_tests {
         assert!(!missing.is_empty(), "Should detect missing constraints");
     }
 
-    #[tokio::test]
-    async fn test_detect_conflicts() {
-        let config = Config::default();
-        let parser = HclParser::new(&config);
-        let analyzer = Analyzer::new(&config);
-
-        // Parse both conflicting repos
-        let repo_a_path = fixtures_path().join("conflicts/repo_a");
-        let repo_b_path = fixtures_path().join("conflicts/repo_b");
-
-        let mut parsed_a = parser.parse_directory(&repo_a_path).await.unwrap();
-        let parsed_b = parser.parse_directory(&repo_b_path).await.unwrap();
-
-        // Merge results
-        parsed_a.merge(parsed_b);
-
-        let graph = GraphBuilder::new()
-            .build(&parsed_a.modules, &parsed_a.providers, &parsed_a.runtimes)
-            .unwrap();
-
-        let result = analyzer
-            .analyze(&graph, &parsed_a.modules, &parsed_a.providers, &parsed_a.runtimes)
-            .unwrap();
-
-        // Should find constraint conflict findings
-        let conflicts: Vec<_> = result
-            .findings
-            .iter()
-            .filter(|f| f.category == FindingCategory::ConstraintConflict)
-            .collect();
-
-        assert!(
-            !conflicts.is_empty(),
-            "Should detect version constraint conflicts"
-        );
-    }
 }
 
 mod scanner_tests {

@@ -1,7 +1,8 @@
-//! Constraint conflict detection.
+//! Terraform policy and best practice analysis.
 //!
-//! This module implements the core conflict detection algorithm for
-//! version constraints across modules and providers.
+//! This module implements policy checks and best practice analysis for
+//! Terraform version constraints, including missing constraints, risky patterns,
+//! and overly broad constraints.
 
 use crate::analyzer::deprecation;
 use crate::analyzer::patterns::{PatternChecker, RiskyPattern};
@@ -13,41 +14,34 @@ use crate::types::{
 };
 use std::collections::HashMap;
 
-/// Analyzer for detecting version constraint conflicts and issues.
+/// Analyzer for Terraform policy and best practice checks.
 ///
-/// # Algorithm Overview
+/// # Analysis Phases
 ///
-/// The conflict detection algorithm works in several phases:
+/// The analyzer performs the following checks:
 ///
-/// ## Phase 1: Grouping
+/// ## Phase 1: Missing Constraints
 ///
-/// Group all modules/providers by their canonical source identifier.
-/// This creates clusters of items that should be compatible.
+/// Detects modules and providers without version constraints.
+/// Version pinning is a best practice to ensure reproducible deployments.
 ///
-/// ```text
-/// terraform-aws-modules/vpc/aws:
-///   - repo-a/main.tf: ~> 5.0
-///   - repo-b/main.tf: ~> 4.0
-///   - repo-c/main.tf: >= 3.0, < 5.0
-/// ```
+/// ## Phase 2: Risky Patterns
 ///
-/// ## Phase 2: Pairwise Comparison
+/// Identifies problematic constraint patterns:
+/// - Wildcard constraints (`*`)
+/// - Pre-release versions (`1.0.0-beta`)
+/// - Exact versions (prevents patch updates)
+/// - Missing upper bounds (allows breaking changes)
 ///
-/// For each group, compare all pairs of constraints to find conflicts.
+/// ## Phase 3: Broad Constraints
 ///
-/// ```text
-/// Compare: ~> 5.0 vs ~> 4.0
-///   - ~> 5.0 allows: 5.0.0 - 5.x.x
-///   - ~> 4.0 allows: 4.0.0 - 4.x.x
-///   - Overlap: NONE → CONFLICT!
-/// ```
+/// Flags overly permissive constraints like `>= 0.0.0` that provide
+/// no meaningful version control.
 ///
-/// ## Phase 3: Severity Classification
+/// ## Phase 4: Deprecations
 ///
-/// Classify conflicts by severity based on:
-/// - Whether constraints have any overlap
-/// - How narrow the overlap is
-/// - Whether the modules are in the same repository
+/// Checks for deprecated module/provider versions based on configuration
+/// or inline CLI rules.
 ///
 /// # Example
 ///
@@ -73,7 +67,7 @@ impl Analyzer {
         }
     }
 
-    /// Analyze modules and providers for conflicts and issues.
+    /// Analyze modules and providers for policy violations and best practice issues.
     ///
     /// # Errors
     ///
@@ -89,36 +83,24 @@ impl Analyzer {
             modules = modules.len(),
             providers = providers.len(),
             runtimes = runtimes.len(),
-            "Starting analysis"
+            "Starting policy analysis"
         );
         let mut findings = Vec::new();
 
-        // Phase 1: Detect module constraint conflicts
-        tracing::debug!("Phase 1: Detecting module constraint conflicts");
-        let module_conflicts = self.detect_module_conflicts(modules);
-        tracing::debug!(module_conflicts = module_conflicts.len(), "Module conflicts detected");
-        findings.extend(module_conflicts);
-
-        // Phase 2: Detect provider constraint conflicts
-        tracing::debug!("Phase 2: Detecting provider constraint conflicts");
-        let provider_conflicts = self.detect_provider_conflicts(providers);
-        tracing::debug!(provider_conflicts = provider_conflicts.len(), "Provider conflicts detected");
-        findings.extend(provider_conflicts);
-
-        // Phase 3: Check for missing constraints
-        tracing::debug!("Phase 3: Checking for missing constraints");
+        // Phase 1: Check for missing constraints
+        tracing::debug!("Phase 1: Checking for missing constraints");
         let missing = self.check_missing_constraints(modules, providers);
         tracing::debug!(missing_constraints = missing.len(), "Missing constraints found");
         findings.extend(missing);
 
-        // Phase 4: Check for risky patterns
-        tracing::debug!("Phase 4: Checking for risky patterns");
+        // Phase 2: Check for risky patterns
+        tracing::debug!("Phase 2: Checking for risky patterns");
         let risky = self.check_risky_patterns(modules, providers);
         tracing::debug!(risky_patterns = risky.len(), "Risky patterns found");
         findings.extend(risky);
 
-        // Phase 5: Check for broad constraints
-        tracing::debug!("Phase 5: Checking for broad constraints");
+        // Phase 3: Check for broad constraints
+        tracing::debug!("Phase 3: Checking for broad constraints");
         let broad = self.check_broad_constraints(modules, providers);
         tracing::debug!(broad_constraints = broad.len(), "Broad constraints found");
         findings.extend(broad);
@@ -151,229 +133,6 @@ impl Analyzer {
             summary,
             timestamp: Some(chrono::Utc::now()),
             deprecations,
-        })
-    }
-
-    /// Detect conflicts between module version constraints.
-    fn detect_module_conflicts(&self, modules: &[ModuleRef]) -> Vec<Finding> {
-        let mut findings = Vec::new();
-
-        // Group modules by source
-        let grouped = self.group_modules_by_source(modules);
-        tracing::debug!(module_groups = grouped.len(), "Grouped modules by source for conflict detection");
-
-        // Check each group for conflicts
-        for (source, module_refs) in grouped {
-            if module_refs.len() < 2 {
-                tracing::debug!(
-                    source = %source,
-                    count = module_refs.len(),
-                    "Skipping source with less than 2 modules"
-                );
-                continue;
-            }
-
-            tracing::debug!(
-                source = %source,
-                count = module_refs.len(),
-                "Checking module conflicts for source"
-            );
-
-            // Compare all pairs
-            let mut pairs_checked = 0;
-            for i in 0..module_refs.len() {
-                for j in (i + 1)..module_refs.len() {
-                    pairs_checked += 1;
-                    let m1 = module_refs[i];
-                    let m2 = module_refs[j];
-
-                    if let Some(finding) = self.check_constraint_conflict(
-                        &source,
-                        m1.version_constraint.as_ref(),
-                        m2.version_constraint.as_ref(),
-                        &m1.file_path,
-                        m1.line_number,
-                        m1.repository.as_deref(),
-                        &m2.file_path,
-                        m2.line_number,
-                        m2.repository.as_deref(),
-                    ) {
-                        tracing::debug!(
-                            source = %source,
-                            constraint1 = %m1.version_constraint.as_ref().map(|c| c.raw.as_str()).unwrap_or("none"),
-                            constraint2 = %m2.version_constraint.as_ref().map(|c| c.raw.as_str()).unwrap_or("none"),
-                            "Found module constraint conflict"
-                        );
-                        findings.push(finding);
-                    }
-                }
-            }
-            tracing::debug!(
-                source = %source,
-                pairs_checked = pairs_checked,
-                conflicts_found = findings.len(),
-                "Completed conflict checking for source"
-            );
-        }
-
-        findings
-    }
-
-    /// Detect conflicts between provider version constraints.
-    fn detect_provider_conflicts(&self, providers: &[ProviderRef]) -> Vec<Finding> {
-        let mut findings = Vec::new();
-
-        // Group providers by source
-        let grouped = self.group_providers_by_source(providers);
-        tracing::debug!(provider_groups = grouped.len(), "Grouped providers by source for conflict detection");
-
-        // Check each group for conflicts
-        for (source, provider_refs) in grouped {
-            if provider_refs.len() < 2 {
-                tracing::debug!(
-                    source = %source,
-                    count = provider_refs.len(),
-                    "Skipping source with less than 2 providers"
-                );
-                continue;
-            }
-
-            tracing::debug!(
-                source = %source,
-                count = provider_refs.len(),
-                "Checking provider conflicts for source"
-            );
-
-            // Compare all pairs
-            let mut pairs_checked = 0;
-            for i in 0..provider_refs.len() {
-                for j in (i + 1)..provider_refs.len() {
-                    pairs_checked += 1;
-                    let p1 = provider_refs[i];
-                    let p2 = provider_refs[j];
-
-                    if let Some(finding) = self.check_constraint_conflict(
-                        &source,
-                        p1.version_constraint.as_ref(),
-                        p2.version_constraint.as_ref(),
-                        &p1.file_path,
-                        p1.line_number,
-                        p1.repository.as_deref(),
-                        &p2.file_path,
-                        p2.line_number,
-                        p2.repository.as_deref(),
-                    ) {
-                        tracing::debug!(
-                            source = %source,
-                            constraint1 = %p1.version_constraint.as_ref().map(|c| c.raw.as_str()).unwrap_or("none"),
-                            constraint2 = %p2.version_constraint.as_ref().map(|c| c.raw.as_str()).unwrap_or("none"),
-                            "Found provider constraint conflict"
-                        );
-                        findings.push(finding);
-                    }
-                }
-            }
-            tracing::debug!(
-                source = %source,
-                pairs_checked = pairs_checked,
-                "Completed conflict checking for provider source"
-            );
-        }
-
-        findings
-    }
-
-    /// Check if two constraints conflict.
-    #[allow(clippy::too_many_arguments)]
-    fn check_constraint_conflict(
-        &self,
-        source: &str,
-        constraint1: Option<&Constraint>,
-        constraint2: Option<&Constraint>,
-        file1: &std::path::Path,
-        line1: usize,
-        repo1: Option<&str>,
-        file2: &std::path::Path,
-        line2: usize,
-        repo2: Option<&str>,
-    ) -> Option<Finding> {
-        // If either has no constraint, no conflict (but might be a separate issue)
-        let c1 = constraint1?;
-        let c2 = constraint2?;
-
-        tracing::debug!(
-            source = %source,
-            constraint1 = %c1.raw,
-            constraint2 = %c2.raw,
-            file1 = %file1.display(),
-            file2 = %file2.display(),
-            "Checking constraint conflict"
-        );
-
-        // Check for conflict
-        if !c1.conflicts_with(c2) {
-            tracing::debug!(
-                source = %source,
-                constraint1 = %c1.raw,
-                constraint2 = %c2.raw,
-                "Constraints do not conflict"
-            );
-            return None;
-        }
-
-        tracing::debug!(
-            source = %source,
-            constraint1 = %c1.raw,
-            constraint2 = %c2.raw,
-            repo1 = ?repo1,
-            repo2 = ?repo2,
-            "Constraints conflict detected"
-        );
-
-        // Determine severity based on context
-        let severity = if repo1 == repo2 {
-            // Same repo: more severe
-            tracing::debug!(source = %source, "Same repository conflict, using Error severity");
-            Severity::Error
-        } else {
-            // Different repos: might be intentional
-            tracing::debug!(source = %source, "Different repository conflict, using Warning severity");
-            Severity::Warning
-        };
-
-        let location1 = Location {
-            file: file1.to_path_buf(),
-            line: line1,
-            column: None,
-            repository: repo1.map(String::from),
-        };
-
-        let location2 = Location {
-            file: file2.to_path_buf(),
-            line: line2,
-            column: None,
-            repository: repo2.map(String::from),
-        };
-
-        Some(Finding {
-            code: "DRIFT001".to_string(),
-            severity,
-            message: format!(
-                "Version constraint conflict for '{source}': '{}' vs '{}'",
-                c1.raw, c2.raw
-            ),
-            description: Some(format!(
-                "The constraints '{}' and '{}' have no overlapping versions. \
-                 This will cause Terraform to fail when both modules are used together.",
-                c1.raw, c2.raw
-            )),
-            location: Some(location1),
-            related_locations: vec![location2],
-            suggestion: Some(format!(
-                "Consider aligning the constraints. A compatible range might be: '{}'",
-                suggest_compatible_constraint(c1, c2)
-            )),
-            category: FindingCategory::ConstraintConflict,
         })
     }
 
@@ -623,32 +382,6 @@ impl Analyzer {
         }
     }
 
-    /// Group modules by their canonical source.
-    fn group_modules_by_source<'a>(
-        &self,
-        modules: &'a [ModuleRef],
-    ) -> HashMap<String, Vec<&'a ModuleRef>> {
-        let mut grouped: HashMap<String, Vec<&ModuleRef>> = HashMap::new();
-        for module in modules {
-            let key = module.source.canonical_id();
-            grouped.entry(key).or_default().push(module);
-        }
-        grouped
-    }
-
-    /// Group providers by their canonical source.
-    fn group_providers_by_source<'a>(
-        &self,
-        providers: &'a [ProviderRef],
-    ) -> HashMap<String, Vec<&'a ProviderRef>> {
-        let mut grouped: HashMap<String, Vec<&ProviderRef>> = HashMap::new();
-        for provider in providers {
-            let key = provider.qualified_source();
-            grouped.entry(key).or_default().push(provider);
-        }
-        grouped
-    }
-
     /// Build analysis summary.
     fn build_summary(
         &self,
@@ -684,21 +417,6 @@ impl Analyzer {
             findings_by_category,
         }
     }
-}
-
-/// Suggest a compatible constraint given two conflicting constraints.
-fn suggest_compatible_constraint(c1: &Constraint, c2: &Constraint) -> String {
-    // This is a simplified suggestion; a full implementation would
-    // compute the intersection of the constraint ranges
-    
-    // For now, suggest the more restrictive of the two
-    if c1.raw.contains("~>") && c2.raw.contains("~>") {
-        // Both pessimistic: suggest the higher one
-        return format!("{} (align both to this)", c1.raw);
-    }
-
-    // Default suggestion
-    "align both constraints to the same range".to_string()
 }
 
 #[cfg(test)]
@@ -746,30 +464,6 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_module_conflict() {
-        let modules = vec![
-            create_module("vpc1", "vpc", Some(">= 5.0"), "repo-a"),
-            create_module("vpc2", "vpc", Some("<= 4.5"), "repo-b"),
-        ];
-        let providers = vec![];
-
-        let graph = GraphBuilder::new().build(&modules, &providers, &[]).unwrap();
-        let config = Config::default();
-        let analyzer = Analyzer::new(&config);
-
-        let result = analyzer.analyze(&graph, &modules, &providers, &[]).unwrap();
-
-        // Should find the conflict
-        let conflicts: Vec<_> = result
-            .findings
-            .iter()
-            .filter(|f| f.category == FindingCategory::ConstraintConflict)
-            .collect();
-
-        assert!(!conflicts.is_empty(), "Should detect constraint conflict");
-    }
-
-    #[test]
     fn test_detect_missing_constraint() {
         let modules = vec![create_module("vpc", "vpc", None, "repo-a")];
         let providers = vec![];
@@ -790,29 +484,6 @@ mod tests {
     }
 
     #[test]
-    fn test_no_conflict_when_compatible() {
-        let modules = vec![
-            create_module("vpc1", "vpc", Some(">= 4.0"), "repo-a"),
-            create_module("vpc2", "vpc", Some("<= 5.0"), "repo-b"),
-        ];
-        let providers = vec![];
-
-        let graph = GraphBuilder::new().build(&modules, &providers, &[]).unwrap();
-        let config = Config::default();
-        let analyzer = Analyzer::new(&config);
-
-        let result = analyzer.analyze(&graph, &modules, &providers, &[]).unwrap();
-
-        let conflicts: Vec<_> = result
-            .findings
-            .iter()
-            .filter(|f| f.category == FindingCategory::ConstraintConflict)
-            .collect();
-
-        assert!(conflicts.is_empty(), "Should not detect conflict for compatible constraints");
-    }
-
-    #[test]
     fn test_detect_broad_constraint() {
         let modules = vec![create_module("vpc", "vpc", Some(">= 0.0.0"), "repo-a")];
         let providers = vec![];
@@ -830,29 +501,6 @@ mod tests {
             .collect();
 
         assert!(!broad.is_empty(), "Should detect broad constraint");
-    }
-
-    #[test]
-    fn test_provider_conflict() {
-        let modules = vec![];
-        let providers = vec![
-            create_provider("aws", Some(">= 5.0"), "repo-a"),
-            create_provider("aws", Some("<= 4.0"), "repo-b"),
-        ];
-
-        let graph = GraphBuilder::new().build(&modules, &providers, &[]).unwrap();
-        let config = Config::default();
-        let analyzer = Analyzer::new(&config);
-
-        let result = analyzer.analyze(&graph, &modules, &providers, &[]).unwrap();
-
-        let conflicts: Vec<_> = result
-            .findings
-            .iter()
-            .filter(|f| f.category == FindingCategory::ConstraintConflict)
-            .collect();
-
-        assert!(!conflicts.is_empty(), "Should detect provider conflict");
     }
 
     #[test]

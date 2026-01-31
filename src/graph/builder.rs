@@ -429,7 +429,7 @@ mod tests {
         let module = ModuleRef {
             name: "vpc".to_string(),
             source: ModuleSource::Git {
-                host: "github.com/terraform-aws-modules/terraform-aws-vpc.git".to_string(),
+                host: "github.com/terraform-aws-modules/terraform-aws-vpc".to_string(),
                 url: "https://github.com/terraform-aws-modules/terraform-aws-vpc.git".to_string(),
                 ref_: None,
                 subdir: None,
