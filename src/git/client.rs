@@ -34,7 +34,7 @@ impl GitClient {
         ];
 
         // Create temp directory for cloned repos
-        let temp_dir = std::env::temp_dir().join("monphare-repos");
+        let temp_dir = std::env::temp_dir();
 
         Self {
             config,
