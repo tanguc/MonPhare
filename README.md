@@ -2,9 +2,8 @@
 
 **Terraform/OpenTofu module constraint analyzer and dependency mapper.**
 
-[![CI](https://github.com/yourusername/monphare/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/monphare/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/monphare.svg)](https://crates.io/crates/monphare)
-[![Documentation](https://docs.rs/monphare/badge.svg)](https://docs.rs/monphare)
+[![CI](https://github.com/tanguc/kanongraph/actions/workflows/ci.yml/badge.svg)](https://github.com/tanguc/kanongraph/actions/workflows/ci.yml)
+[![Release](https://github.com/tanguc/kanongraph/actions/workflows/release.yml/badge.svg)](https://github.com/tanguc/kanongraph/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 MonPhare scans Terraform/OpenTofu repositories, parses HCL files, builds dependency graphs, and detects version constraint conflicts, deprecated modules, and risky patterns.
@@ -18,18 +17,40 @@ MonPhare scans Terraform/OpenTofu repositories, parses HCL files, builds depende
 - **🚨 Risk Analysis**: Flag deprecated modules, missing constraints, and risky patterns
 - **📊 Multiple Output Formats**: JSON, plain text, and self-contained HTML reports
 - **🔧 CI/CD Ready**: Exit codes for automated pipeline checks
+- **⚡ Smart Caching**: Repository caching with fresh threshold for fast repeat scans
 
 ## 🚀 Quick Start
 
 ### Installation
 
-```bash
-# From crates.io
-cargo install monphare
+#### Pre-built Binaries (Recommended)
 
+Download the latest release for your platform from the [Releases page](https://github.com/tanguc/kanongraph/releases):
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| Linux | x86_64 | `monphare-linux-x86_64.tar.gz` |
+| Linux | ARM64 | `monphare-linux-aarch64.tar.gz` |
+| macOS | Intel | `monphare-darwin-x86_64.tar.gz` |
+| macOS | Apple Silicon | `monphare-darwin-aarch64.tar.gz` |
+| Windows | x86_64 | `monphare-windows-x86_64.zip` |
+
+```bash
+# Linux/macOS - download and extract
+curl -LO https://github.com/tanguc/kanongraph/releases/latest/download/monphare-linux-x86_64.tar.gz
+tar -xzf monphare-linux-x86_64.tar.gz
+sudo mv monphare /usr/local/bin/
+
+# Verify installation
+monphare --version
+```
+
+#### From Source
+
+```bash
 # From source
-git clone https://github.com/yourusername/monphare
-cd monphare
+git clone https://github.com/tanguc/kanongraph
+cd kanongraph
 cargo install --path .
 ```
 
