@@ -11,7 +11,7 @@ const config = {
   },
 
   url: 'https://tanguc.github.io',
-  baseUrl: '/monphare/',
+  baseUrl: '/MonPhare/',
 
   organizationName: 'tanguc',
   projectName: 'monphare',
