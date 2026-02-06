@@ -679,8 +679,6 @@ impl VcsClient for AzureDevOpsClient {
             org
         );
 
-        crate::wait_for_user_input().await;
-
         // Cache the results
         if self.client.cache().enabled {
             if let Err(e) = self.client.cache().save("ado", org, &repos) {

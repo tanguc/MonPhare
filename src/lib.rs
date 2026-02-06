@@ -60,7 +60,6 @@ pub mod vcs_clients;
 // Re-export commonly used types at crate root
 pub use config::Config;
 pub use error::{MonPhareError, Result};
-use tokio::io::AsyncReadExt;
 pub use types::{
     AnalysisResult, Constraint, ModuleRef, ProviderRef, ReportFormat, ScanResult, Severity,
     VersionRange,
@@ -215,7 +214,7 @@ impl Scanner {
         &self,
         platform: VcsPlatform,
         org_spec: &str,
-        _skip_confirmation: bool,
+        skip_confirmation: bool,
     ) -> Result<ScanResult> {
         use crate::vcs::{VcsClient, VcsIdentifier};
         use crate::vcs_clients::{
@@ -283,6 +282,23 @@ impl Scanner {
 
         if repo_count == 0 {
             return Ok(ScanResult::default());
+        }
+
+        // prompt for confirmation when there are many repos
+        const CONFIRMATION_THRESHOLD: usize = 50;
+        if repo_count > CONFIRMATION_THRESHOLD && !skip_confirmation {
+            println!(
+                "Found {repo_count} repositories in '{org_spec}'. Proceed with scanning? [y/N]"
+            );
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input).map_err(|e| {
+                MonPhareError::io(std::path::PathBuf::from("stdin"), e, file!(), line!())
+            })?;
+            let answer = input.trim().to_lowercase();
+            if answer != "y" && answer != "yes" {
+                println!("Scan cancelled.");
+                return Ok(ScanResult::default());
+            }
         }
 
         // Create progress bar
@@ -355,13 +371,6 @@ impl Scanner {
 
         Ok(merged)
     }
-}
-
-#[allow(clippy::unused_io_amount)]
-pub async fn wait_for_user_input() {
-    println!("Press Enter to continue...");
-    let mut input: [u8; 1] = [0; 1];
-    let _ = tokio::io::stdin().read(&mut input).await;
 }
 
 #[cfg(test)]

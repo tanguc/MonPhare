@@ -12,15 +12,16 @@ Scan local directories, Git repositories, or entire VCS organizations for Terraf
 ## Synopsis
 
 ```
-monphare scan [OPTIONS] [PATH]...
+monphare scan [OPTIONS] [PATH | URL]...
 ```
+
+Positional arguments are auto-detected: URLs (starting with `https://`, `http://`, or `git@`) are treated as remote repositories, everything else is treated as a local path.
 
 ## Options
 
 | Short | Long | Env Var | Description | Default |
 |-------|------|---------|-------------|---------|
-| | `[PATH]...` | | Local directories to scan. If omitted, scans the current directory. | `.` |
-| `-r` | `--repo <URL>` | | Git repository URL to clone and scan. Can be repeated. | |
+| | `[PATH \| URL]...` | | Local directories or remote repository URLs to scan. URLs are auto-detected. If omitted, scans the current directory. | `.` |
 | | `--github <ORG>` | | Scan all repositories in a GitHub organization. | |
 | | `--gitlab <GROUP>` | | Scan all projects in a GitLab group. | |
 | | `--ado <ORG[/PROJECT]>` | | Scan repositories in an Azure DevOps organization, or a specific project within it. | |
@@ -33,9 +34,9 @@ monphare scan [OPTIONS] [PATH]...
 | | `--max-depth <N>` | | Maximum depth for recursive directory scanning. | `100` |
 | `-e` | `--exclude <PATTERN>` | | Glob pattern to exclude from scanning. Can be repeated. | |
 | | `--branch <BRANCH>` | | Git branch to checkout after cloning. | default branch |
-| | `--git-token <TOKEN>` | `MONPHARE_GIT_TOKEN` | Authentication token for private Git repositories. | |
+| | `--git-token <TOKEN>` | `MONPHARE_GIT_TOKEN` | Authentication token for private Git repositories. Not required for public repos. | |
 
-The `--github`, `--gitlab`, `--ado`, and `--bitbucket` options are mutually exclusive with `[PATH]` and `--repo`.
+The `--github`, `--gitlab`, `--ado`, and `--bitbucket` options are mutually exclusive with positional arguments.
 
 ## Exit Codes
 
@@ -59,25 +60,37 @@ Scan specific directories:
 monphare scan ./infra ./modules/networking
 ```
 
-Scan a remote repository:
+Scan a remote repository (public, no token needed):
 
 ```bash
-monphare scan --repo https://github.com/org/terraform-infra
+monphare scan https://github.com/terraform-aws-modules/terraform-aws-vpc
 ```
 
 Scan multiple repositories:
 
 ```bash
 monphare scan \
-  --repo https://github.com/org/repo1 \
-  --repo https://github.com/org/repo2
+  https://github.com/org/repo1 \
+  https://github.com/org/repo2
 ```
 
-Scan an entire GitHub organization:
+Mix local and remote in the same command:
+
+```bash
+monphare scan ./local-infra https://github.com/org/remote-repo
+```
+
+Scan an entire GitHub organization (public orgs work without a token):
+
+```bash
+monphare scan --github terraform-aws-modules
+```
+
+Scan a private GitHub organization:
 
 ```bash
 export MONPHARE_GIT_TOKEN=ghp_xxxx
-monphare scan --github my-org --yes
+monphare scan --github my-private-org --yes
 ```
 
 Generate a JSON report and write to file:
@@ -108,7 +121,7 @@ Scan a private repo with a specific branch:
 
 ```bash
 monphare scan \
-  --repo https://github.com/org/private-repo \
+  https://github.com/org/private-repo \
   --git-token ghp_xxxx \
   --branch develop
 ```

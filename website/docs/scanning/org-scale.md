@@ -11,11 +11,15 @@ MonPhare can discover and scan every repository in a GitHub organization, GitLab
 
 ### GitHub
 
-Scan all repositories in a GitHub organization:
+Scan all repositories in a GitHub organization. Public orgs work without a token:
 
 ```bash
+# public org -- no token needed
+monphare scan --github terraform-aws-modules
+
+# private org -- set token
 export MPH_GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-monphare scan --github my-org
+monphare scan --github my-private-org
 ```
 
 The token needs the `repo` scope (or `read:org` + `repo` for organization-level access to private repos).
@@ -61,13 +65,15 @@ The token needs repository read permissions. For Bitbucket Cloud, use an App Pas
 
 ## Authentication
 
-All organization-wide scanning modes require a token. MonPhare resolves tokens with the following priority:
+For private organizations, MonPhare resolves tokens with the following priority:
 
 1. Platform-specific config value in `monphare.yaml` (e.g., `git.github_token`)
 2. Platform-specific environment variable (e.g., `MPH_GITHUB_TOKEN`)
 3. Legacy fallback environment variable (`MONPHARE_GIT_TOKEN`)
 
 You can also pass `--git-token` on the command line, which applies as a fallback across all platforms.
+
+Public organizations (like `terraform-aws-modules` on GitHub) do not require any token.
 
 See the full token resolution table in [Remote Repositories](./remote-repositories.md#authentication).
 
@@ -87,20 +93,23 @@ monphare scan --github my-org --yes
 
 ## Mode exclusivity
 
-Organization-wide scanning flags (`--github`, `--gitlab`, `--ado`, `--bitbucket`) conflict with `--repo` and positional path arguments. You can only use one scanning mode at a time:
+Organization-wide scanning flags (`--github`, `--gitlab`, `--ado`, `--bitbucket`) conflict with positional path and URL arguments. You can only use one scanning mode at a time:
 
 ```bash
 # valid -- org scan
 monphare scan --github my-org
 
-# valid -- repo scan
-monphare scan --repo https://github.com/my-org/repo
+# valid -- remote URL scan
+monphare scan https://github.com/my-org/repo
 
 # valid -- local scan
 monphare scan ./infrastructure
 
+# valid -- mixed local + remote
+monphare scan ./local-repo https://github.com/my-org/remote-repo
+
 # invalid -- will error
-monphare scan --github my-org --repo https://github.com/my-org/repo
+monphare scan --github my-org https://github.com/my-org/repo
 monphare scan --github my-org ./infrastructure
 ```
 

@@ -9,36 +9,46 @@ MonPhare can clone and scan remote Git repositories without requiring you to hav
 
 ## Scanning a remote repo
 
-Use the `--repo` flag with a Git-compatible URL:
+Pass a Git URL directly as a positional argument -- MonPhare auto-detects URLs and handles them as remote repositories:
 
 ```bash
-monphare scan --repo https://github.com/my-org/infra-modules
+monphare scan https://github.com/my-org/infra-modules
 ```
 
-MonPhare clones the repository into a local cache, scans all `.tf` files, and reports findings. The repository name (e.g., `infra-modules`) is used as the label in the output.
+Public repositories work without any token. MonPhare clones the repository into a local cache, scans all `.tf` files, and reports findings. The repository name (e.g., `infra-modules`) is used as the label in the output.
 
 ## Multiple repositories
 
-Pass `--repo` multiple times to scan several repositories in one run:
+Pass multiple URLs to scan several repositories in one run:
 
 ```bash
 monphare scan \
-  --repo https://github.com/my-org/infra-modules \
-  --repo https://github.com/my-org/platform-config \
-  --repo https://github.com/my-org/data-pipelines
+  https://github.com/my-org/infra-modules \
+  https://github.com/my-org/platform-config \
+  https://github.com/my-org/data-pipelines
 ```
 
 Results from all repositories appear in a single combined report, grouped by repository name.
 
+## Mixing local and remote
+
+You can freely mix local paths and remote URLs in the same command:
+
+```bash
+monphare scan ./local-repo https://github.com/my-org/remote-repo
+```
+
+MonPhare auto-detects which arguments are URLs (starts with `https://`, `http://`, or `git@`) and which are local paths.
+
 ## Authentication
 
-Private repositories require a Git token. You can provide it in two ways:
+Public repositories do not require a token. For private repositories, you can provide a token in two ways:
 
 ### Environment variable (preferred)
 
 ```bash
 export MONPHARE_GIT_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-monphare scan --repo https://github.com/my-org/private-repo
+monphare scan https://github.com/my-org/private-repo
 ```
 
 You can also use platform-specific environment variables which take precedence over the generic one:
@@ -54,7 +64,7 @@ You can also use platform-specific environment variables which take precedence o
 ### CLI flag
 
 ```bash
-monphare scan --repo https://github.com/my-org/private-repo --git-token ghp_xxxxxxxxxxxxxxxxxxxx
+monphare scan https://github.com/my-org/private-repo --git-token ghp_xxxxxxxxxxxxxxxxxxxx
 ```
 
 The `--git-token` flag is convenient for one-off usage but avoid it in scripts where the token might end up in shell history. Prefer the environment variable approach.
@@ -64,7 +74,7 @@ The `--git-token` flag is convenient for one-off usage but avoid it in scripts w
 By default, MonPhare uses the repository's default branch. To scan a different branch:
 
 ```bash
-monphare scan --repo https://github.com/my-org/infra-modules --branch feature/new-modules
+monphare scan https://github.com/my-org/infra-modules --branch feature/new-modules
 ```
 
 The `--branch` flag applies to all repositories in the same command.
@@ -102,8 +112,8 @@ A full example scanning two private GitHub repos with authentication:
 export MPH_GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 
 monphare scan \
-  --repo https://github.com/acme-corp/terraform-networking \
-  --repo https://github.com/acme-corp/terraform-compute \
+  https://github.com/acme-corp/terraform-networking \
+  https://github.com/acme-corp/terraform-compute \
   --branch main \
   --format json \
   --output audit.json

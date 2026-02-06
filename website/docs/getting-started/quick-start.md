@@ -14,7 +14,7 @@ monphare scan ./terraform
 Example output:
 
 ```
-MonPhare v0.1.1  [FAILED]  3 errors, 3 warnings
+MonPhare v0.3.0  [FAILED]  3 errors, 3 warnings
 Scanned: 1 files, 4 modules, 3 providers
 
 | Sev  | Resource              | Issue          | Current  | File      |
@@ -30,8 +30,39 @@ Scanned: 1 files, 4 modules, 3 providers
 
 ## Scan remote repositories
 
+Public repositories work without any token:
+
 ```bash
-monphare scan --repo https://github.com/org/repo1 --repo https://github.com/org/repo2
+monphare scan https://github.com/terraform-aws-modules/terraform-aws-vpc
+```
+
+Scan multiple repos at once:
+
+```bash
+monphare scan \
+  https://github.com/org/repo1 \
+  https://github.com/org/repo2
+```
+
+Mix local and remote:
+
+```bash
+monphare scan ./local-repo https://github.com/org/remote-repo
+```
+
+## Scan an entire GitHub org
+
+Public orgs work without a token:
+
+```bash
+monphare scan --github terraform-aws-modules
+```
+
+For private orgs, set a token:
+
+```bash
+export MONPHARE_GIT_TOKEN=ghp_xxxx
+monphare scan --github my-private-org
 ```
 
 ## Generate reports
