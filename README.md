@@ -46,7 +46,7 @@ Nobody knows until something breaks. MonPhare finds these before production does
 | **Exact pin** | Frozen -- no patches, no security fixes | `version = "= 2.44.0"` |
 | **Pre-release** | Alpha/beta refs in production | `version = "~> 2.0.0-beta"` |
 | **Cross-repo conflict** | Two repos want incompatible ranges for the same module | repo-a: `>= 5.0` vs repo-b: `< 5.0` |
-| **Deprecated module** | Module with known CVE or retired version still in use | `claranet/azure-log-mngt-v1/azurerm` at `1.0.1` |
+| **Deprecated module** | Module with known CVE or retired version still in use | `terraform-aws-modules/vpc/aws` at `1.0.1` |
 | **Deprecated provider** | Provider version range flagged by your security team | `hashicorp/azurerm` `< 3.50.0` |
 | **Deprecated runtime** | Terraform/OpenTofu version too old | `terraform < 0.13.0` |
 
@@ -218,11 +218,11 @@ policies:
 # flag modules/providers with known issues
 deprecations:
   modules:
-    "claranet/azure-log-mngt-v1/azurerm":
+    "terraform-aws-modules/vpc/aws":
       - version: "1.0.1"
-        reason: "Critical security vulnerability CVE-2023-1234"
+        reason: "Critical security vulnerability in VPC module versions before 3.0"
         severity: error
-        replacement: "claranet/azure-log-mngt-v3/azurerm"
+        replacement: "terraform-aws-modules/vpc/aws >= 5.0.0"
   providers:
     "hashicorp/azurerm":
       versions:

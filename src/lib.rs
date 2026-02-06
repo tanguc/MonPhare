@@ -229,27 +229,28 @@ impl Scanner {
             "Starting bulk VCS organization scanning"
         );
 
-        // Get token for the platform
-        let token = self.config.git.get_token_for_platform(platform.as_str())?;
+        // Get token for the platform (optional for public orgs)
+        let token = self.config.git.get_token_for_platform(platform.as_str()).ok();
+        let token_str = token.as_deref().unwrap_or("");
 
         // Create the appropriate client
         let client = CachedRateLimitedClient::default();
         let repositories = match platform {
             VcsPlatform::GitHub => {
                 let gh_client = GitHubClient::new(client);
-                gh_client.discover_repositories(org_spec, &token).await?
+                gh_client.discover_repositories(org_spec, token_str).await?
             }
             VcsPlatform::GitLab => {
                 let gl_client = GitLabClient::new(client);
-                gl_client.discover_repositories(org_spec, &token).await?
+                gl_client.discover_repositories(org_spec, token_str).await?
             }
             VcsPlatform::AzureDevOps => {
                 let ado_client = AzureDevOpsClient::new(client);
-                ado_client.discover_repositories(org_spec, &token).await?
+                ado_client.discover_repositories(org_spec, token_str).await?
             }
             VcsPlatform::Bitbucket => {
                 let bb_client = BitbucketClient::new(client);
-                bb_client.discover_repositories(org_spec, &token).await?
+                bb_client.discover_repositories(org_spec, token_str).await?
             }
             VcsPlatform::Local => {
                 return Err(crate::err!(ConfigParse {

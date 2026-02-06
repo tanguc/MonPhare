@@ -181,7 +181,9 @@ impl VcsClient for GitHubClient {
                 .client()
                 .client()
                 .request(reqwest::Method::GET, &url);
-            request = request.header("Authorization", format!("token {token}"));
+            if !token.is_empty() {
+                request = request.header("Authorization", format!("token {token}"));
+            }
 
             let response = request.send().await.map_err(|e| {
                 crate::err!(VcsApi {

@@ -10,6 +10,7 @@ use crate::types::{
 };
 
 use hcl::{Block, Body, Expression};
+use regex::Regex;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -171,15 +172,18 @@ impl Parser for HclParser {
         file_path: &Path,
         repository: Option<&str>,
     ) -> Result<ParsedHcl> {
-        // Parse HCL content
-        let body: Body = hcl::from_str(content).map_err(|e| {
-            crate::err!(HclParse {
-                file: file_path.to_path_buf(),
-                message: e.to_string(),
-                line: None,
-                column: None,
-            })
-        })?;
+        // Parse HCL content, fall back to regex if hcl-rs can't handle it
+        let body: Body = match hcl::from_str(content) {
+            Ok(body) => body,
+            Err(e) => {
+                tracing::warn!(
+                    file = %file_path.display(),
+                    error = %e,
+                    "hcl-rs parse failed, falling back to regex extraction"
+                );
+                return parse_content_regex(content, file_path, repository);
+            }
+        };
 
         let mut result = ParsedHcl {
             modules: Vec::new(),
@@ -534,6 +538,99 @@ fn object_key_to_string(key: &hcl::ObjectKey) -> String {
     }
 }
 
+/// Regex-based fallback parser for when hcl-rs can't handle the file.
+/// Extracts module blocks (name, source, version) and terraform required_providers.
+fn parse_content_regex(
+    content: &str,
+    file_path: &Path,
+    repository: Option<&str>,
+) -> Result<ParsedHcl> {
+    let mut result = ParsedHcl {
+        modules: Vec::new(),
+        providers: Vec::new(),
+        runtimes: Vec::new(),
+        files: vec![file_path.to_path_buf()],
+        warnings: Vec::new(),
+    };
+
+    // extract module blocks: module "name" { ... source = "..." ... version = "..." ... }
+    let module_re = Regex::new(
+        r#"(?s)module\s+"([^"]+)"\s*\{[^}]*?source\s*=\s*"([^"]+)"(?:[^}]*?version\s*=\s*"([^"]+)")?[^}]*?\}"#
+    ).unwrap();
+
+    for cap in module_re.captures_iter(content) {
+        let name = cap[1].to_string();
+        let source_str = cap[2].to_string();
+        let source = super::parse_module_source(&source_str)?;
+
+        let version_constraint = cap.get(3).and_then(|m| {
+            Constraint::parse(m.as_str()).ok()
+        });
+
+        result.modules.push(ModuleRef {
+            name,
+            source,
+            version_constraint,
+            file_path: file_path.to_path_buf(),
+            line_number: 0,
+            repository: repository.map(String::from),
+            attributes: std::collections::HashMap::new(),
+        });
+    }
+
+    // extract required_providers: name = { source = "..." version = "..." }
+    let provider_re = Regex::new(
+        r#"(?s)required_providers\s*\{(.*?)\n\s*\}"#
+    ).unwrap();
+    let provider_entry_re = Regex::new(
+        r#"(?s)(\w+)\s*=\s*\{[^}]*?source\s*=\s*"([^"]+)"(?:[^}]*?version\s*=\s*"([^"]+)")?[^}]*?\}"#
+    ).unwrap();
+
+    for block_cap in provider_re.captures_iter(content) {
+        let block_content = &block_cap[1];
+        for cap in provider_entry_re.captures_iter(block_content) {
+            let name = cap[1].to_string();
+            let source = Some(cap[2].to_string());
+            let version_constraint = cap.get(3).and_then(|m| {
+                Constraint::parse(m.as_str()).ok()
+            });
+
+            result.providers.push(ProviderRef {
+                name,
+                source,
+                version_constraint,
+                file_path: file_path.to_path_buf(),
+                line_number: 0,
+                repository: repository.map(String::from),
+            });
+        }
+    }
+
+    // extract required_version
+    let rv_re = Regex::new(r#"required_version\s*=\s*"([^"]+)""#).unwrap();
+    if let Some(cap) = rv_re.captures(content) {
+        if let Ok(constraint) = Constraint::parse(&cap[1]) {
+            result.runtimes.push(RuntimeRef {
+                name: "terraform".to_string(),
+                version: constraint,
+                source: RuntimeSource::Terraform,
+                file_path: file_path.to_path_buf(),
+                line_number: 0,
+                repository: repository.map(String::from),
+            });
+        }
+    }
+
+    tracing::info!(
+        file = %file_path.display(),
+        modules = result.modules.len(),
+        providers = result.providers.len(),
+        "Regex fallback parsed successfully"
+    );
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -690,8 +787,12 @@ module "no_version" {
         let parser = create_test_parser();
         let content = "this is not valid { hcl";
 
-        let result = parser.parse_content(content, Path::new("test.tf"), None);
-        assert!(result.is_err());
+        // regex fallback returns empty results for garbage input
+        let result = parser
+            .parse_content(content, Path::new("test.tf"), None)
+            .unwrap();
+        assert!(result.modules.is_empty());
+        assert!(result.providers.is_empty());
     }
 
     #[test]

@@ -52,11 +52,11 @@ Fix errors to pass.`;
 const configExample = `# monphare.yaml -- define what your org considers deprecated
 deprecations:
   modules:
-    "claranet/azure-log-mngt-v1/azurerm":
+    "terraform-aws-modules/vpc/aws":
       - version: "< 3.0.0"
-        reason: "CVE-2024-5678 -- critical auth bypass"
+        reason: "Critical security vulnerability in VPC module versions before 3.0"
         severity: error
-        replacement: "claranet/azure-log-mngt-v3/azurerm"
+        replacement: "terraform-aws-modules/vpc/aws >= 5.0.0"
 
   providers:
     "hashicorp/azurerm":

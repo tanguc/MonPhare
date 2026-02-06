@@ -105,27 +105,27 @@ deprecations:
     # Examples:
     # - `github.com/org/repo`
     # - `ssh.dev.azure.com/v3/org/project/repo`
-    "claranet/azure-log-mngt-v1/azurerm":
+    "terraform-aws-modules/vpc/aws":
       - version: "1.0.1"
-        reason: "Critical security vulnerability CVE-2023-1234"
+        reason: "Critical security vulnerability in VPC module versions before 3.0"
         severity: error
-        replacement: "claranet/azure-log-mngt-v3/azurerm"
+        replacement: "terraform-aws-modules/vpc/aws >= 5.0.0"
 
       - version: ">= 2.0.8, < 3.0.0"
-        reason: "Breaking API changes, migrate to v3"
+        reason: "Breaking API changes, migrate to v5"
         severity: warning
-        replacement: "claranet/azure-log-mngt-v3/azurerm"
-      
+        replacement: "terraform-aws-modules/vpc/aws >= 5.0.0"
+
       - version: "~> 3.1"
         reason: "v3.1.x has known performance issues"
         severity: warning
-        replacement: "claranet/azure-log-mngt-v3/azurerm"
+        replacement: "terraform-aws-modules/vpc/aws >= 5.0.0"
 
-    "claranet/azure-log-mngt-v2/azurerm":
+    "terraform-aws-modules/security-group/aws":
       - version: "0.0.10"
-        reason: "CVE-2024-5678 detected during security audit"
+        reason: "Known security issue CVE-2024-1234"
         severity: error
-        replacement: "claranet/azure-log-mngt-v3/azurerm"
+        replacement: "terraform-aws-modules/security-group/aws >= 5.0.0"
 
     "ssh.dev.azure.com/v3/lpl-sources/Terraform/mod-azure-gov-tags":
       - version: "< 3.0.0"
