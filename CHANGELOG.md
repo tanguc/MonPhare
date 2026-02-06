@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/tanguc/MonPhare/compare/v0.2.0...v0.3.0) (2026-02-06)
+
+
+### Features
+
+* add lighthouse logo, favicon, and docs link in README ([ef9feb4](https://github.com/tanguc/MonPhare/commit/ef9feb446d7456f08ae61fba1ba5c83cb56a009e))
+* allow scanning public repos without token and add URL auto-detect ([4f391e9](https://github.com/tanguc/MonPhare/commit/4f391e9c77329c30d147e0c88cec8577633b695d))
+* regex fallback parser, tokenless public org scanning, replace claranet examples ([1ac854d](https://github.com/tanguc/MonPhare/commit/1ac854da2f87930735ca77c89876b153f7532c7f))
+
 ## [0.2.0](https://github.com/tanguc/MonPhare/compare/v0.1.1...v0.2.0) (2026-02-06)
 
 
